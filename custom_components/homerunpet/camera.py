@@ -8,8 +8,10 @@ import aiohttp
 
 from homeassistant.components.camera import (
     Camera,
+    CameraCapabilities,
     CameraEntityFeature,
 )
+from homeassistant.components.camera.const import StreamType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -95,6 +97,16 @@ class HomerunCamera(HomerunBaseEntity, Camera):
         self._cached_image: Optional[bytes] = None
 
     @property
+    def camera_capabilities(self) -> CameraCapabilities:
+        """Expose only WebRTC because the source is transcoded by go2rtc.
+
+        Home Assistant's HLS pipeline cannot consume go2rtc's ``ffmpeg:``
+        producer syntax. Advertising HLS makes the frontend select that broken
+        path even though the go2rtc WebRTC provider can play it correctly.
+        """
+        return CameraCapabilities({StreamType.WEB_RTC})
+
+    @property
     def camera_serial(self) -> str:
         """Return the Ezviz child serial used by the official app."""
         camera_list = self.device_raw_data.get("cameraList") or []
@@ -111,7 +123,7 @@ class HomerunCamera(HomerunBaseEntity, Camera):
             self.camera_serial, token_data
         )
         if source:
-            return source
+            return f"ffmpeg:{source}#video=h264#audio=opus"
 
         # The Ezviz token can expire independently from the HomeRun login token.
         token_data = await self.coordinator.client.async_get_ez_token()
@@ -123,7 +135,7 @@ class HomerunCamera(HomerunBaseEntity, Camera):
             self.camera_serial, token_data
         )
         if source:
-            return source
+            return f"ffmpeg:{source}#video=h264#audio=opus"
 
         detail = self.coordinator.client.last_stream_error or "未知错误"
         raise HomerunApiError(f"无法取得萤石直播地址: {detail}")
