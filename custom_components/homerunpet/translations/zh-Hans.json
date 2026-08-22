@@ -57,6 +57,30 @@
       "reconfigure_successful": "重新配置已成功保存并重新加载！"
     }
   },
+  "entity": {
+    "switch": {
+      "power": { "name": "电源开关" },
+      "child_lock": { "name": "童锁" },
+      "night_mode": { "name": "夜间免打扰" },
+      "auto_clean": { "name": "自动清理" },
+      "auto_cover": { "name": "自动除臭仓盖" },
+      "auto_refill": { "name": "自动补砂" },
+      "kitten_mode": { "name": "幼猫模式" },
+      "lamp": { "name": "照明灯 / 氛围灯" },
+      "deep_clean": { "name": "深度清理" },
+      "fan_switch": { "name": "通风风扇" },
+      "mute": { "name": "静音模式" },
+      "feed_detect": { "name": "出粮检测" },
+      "clog_detect": { "name": "堵食检测" },
+      "next_feed_switch": { "name": "下一餐开关" },
+      "camera_switch": { "name": "摄像机开关" },
+      "mic_switch": { "name": "麦克风开关" },
+      "osd_time_switch": { "name": "画面时间水印" },
+      "object_frame_switch": { "name": "AI 宠物目标框选" },
+      "detect_presence_switch": { "name": "宠物靠近感应检测" },
+      "detect_behavior_switch": { "name": "进食行为记录" }
+    }
+  },
   "options": {
     "step": {
       "init": {

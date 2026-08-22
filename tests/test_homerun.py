@@ -41,6 +41,7 @@ for mod in [
 class MockEntityDescription:
     key: str
     name: Optional[str] = None
+    translation_key: Optional[str] = None
     icon: Optional[str] = None
     entity_category: Optional[Any] = None
     device_class: Optional[Any] = None

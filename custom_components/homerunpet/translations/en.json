@@ -57,6 +57,30 @@
       "reconfigure_successful": "Reconfiguration was successful."
     }
   },
+  "entity": {
+    "switch": {
+      "power": { "name": "Power" },
+      "child_lock": { "name": "Child lock" },
+      "night_mode": { "name": "Do not disturb" },
+      "auto_clean": { "name": "Automatic cleaning" },
+      "auto_cover": { "name": "Automatic deodorizing cover" },
+      "auto_refill": { "name": "Automatic litter refill" },
+      "kitten_mode": { "name": "Kitten mode" },
+      "lamp": { "name": "Light" },
+      "deep_clean": { "name": "Deep cleaning" },
+      "fan_switch": { "name": "Ventilation fan" },
+      "mute": { "name": "Mute mode" },
+      "feed_detect": { "name": "Food dispensing detection" },
+      "clog_detect": { "name": "Food blockage detection" },
+      "next_feed_switch": { "name": "Next meal" },
+      "camera_switch": { "name": "Camera" },
+      "mic_switch": { "name": "Microphone" },
+      "osd_time_switch": { "name": "Video timestamp" },
+      "object_frame_switch": { "name": "AI pet bounding box" },
+      "detect_presence_switch": { "name": "Pet proximity detection" },
+      "detect_behavior_switch": { "name": "Feeding behavior recording" }
+    }
+  },
   "options": {
     "step": {
       "init": {

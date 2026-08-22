@@ -33,14 +33,14 @@ class HomerunSwitchEntityDescription(SwitchEntityDescription):
 SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     HomerunSwitchEntityDescription(
         key="power",
-        name="电源开关",
+        translation_key="power",
         property_key="switch",
         device_class=SwitchDeviceClass.SWITCH,
         is_on_fn=lambda p: bool(p.get("switch")),
     ),
     HomerunSwitchEntityDescription(
         key="child_lock",
-        name="童锁",
+        translation_key="child_lock",
         property_key="child_lock",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:account-lock",
@@ -48,7 +48,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="night_mode",
-        name="夜间免打扰",
+        translation_key="night_mode",
         property_key="night_mode",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:weather-night",
@@ -56,7 +56,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="auto_clean",
-        name="自动清理",
+        translation_key="auto_clean",
         property_key="auto_clean",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:broom",
@@ -64,7 +64,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="auto_cover",
-        name="自动除臭仓盖",
+        translation_key="auto_cover",
         property_key="auto_cover_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:shield-check",
@@ -72,7 +72,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="auto_refill",
-        name="自动补砂",
+        translation_key="auto_refill",
         property_key="auto_refill_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:package-variant-closed",
@@ -80,7 +80,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="kitten_mode",
-        name="幼猫模式",
+        translation_key="kitten_mode",
         property_key="kitten_mode_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:cat",
@@ -88,14 +88,14 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="lamp",
-        name="照明灯 / 氛围灯",
+        translation_key="lamp",
         property_key="lamp_switch",
         icon="mdi:lightbulb",
         is_on_fn=lambda p: bool(p.get("lamp_switch")),
     ),
     HomerunSwitchEntityDescription(
         key="deep_clean",
-        name="深度清理",
+        translation_key="deep_clean",
         property_key="deep_clean_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:shimmer",
@@ -103,14 +103,14 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="fan_switch",
-        name="通风风扇",
+        translation_key="fan_switch",
         property_key="fan_switch",
         icon="mdi:fan",
         is_on_fn=lambda p: bool(p.get("fan_switch")),
     ),
     HomerunSwitchEntityDescription(
         key="mute",
-        name="静音模式",
+        translation_key="mute",
         property_key="mute",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:volume-mute",
@@ -118,7 +118,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="feed_detect",
-        name="出粮检测",
+        translation_key="feed_detect",
         property_key="feed_detect_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:radar",
@@ -126,7 +126,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="clog_detect",
-        name="堵食检测",
+        translation_key="clog_detect",
         property_key="clog_detect_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:alert-circle-check-outline",
@@ -134,7 +134,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="next_feed_switch",
-        name="下一餐开关",
+        translation_key="next_feed_switch",
         property_key="next_feed_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:food-drumstick-outline",
@@ -142,14 +142,14 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="camera_switch",
-        name="摄像机开关",
+        translation_key="camera_switch",
         property_key="camera_switch",
         icon="mdi:camera",
         is_on_fn=lambda p: bool(p.get("camera_switch")),
     ),
     HomerunSwitchEntityDescription(
         key="mic_switch",
-        name="麦克风开关",
+        translation_key="mic_switch",
         property_key="mic_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:microphone",
@@ -157,7 +157,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="osd_time_switch",
-        name="画面时间水印",
+        translation_key="osd_time_switch",
         property_key="osd_time_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:clock-digital",
@@ -165,7 +165,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="object_frame_switch",
-        name="AI 宠物目标框选",
+        translation_key="object_frame_switch",
         property_key="object_frame_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:vector-square",
@@ -173,7 +173,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="detect_presence_switch",
-        name="宠物靠近感应检测",
+        translation_key="detect_presence_switch",
         property_key="detect_presence_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:motion-sensor",
@@ -181,7 +181,7 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
     ),
     HomerunSwitchEntityDescription(
         key="detect_behavior_switch",
-        name="进食行为记录",
+        translation_key="detect_behavior_switch",
         property_key="detect_behavior_switch",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:video-vintage",
