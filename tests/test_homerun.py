@@ -204,6 +204,9 @@ def test_entity_descriptions():
     filter_sensor = next(d for d in SENSOR_DESCRIPTIONS if d.key == "filter_life")
     assert filter_sensor.value_fn(test_props) == 92
 
+    exception_sensor = next(d for d in SENSOR_DESCRIPTIONS if d.key == "exception_messages")
+    assert exception_sensor.value_fn({"exception_messages": [{"detailsTopDes": "缺粮"}]}) == 1
+
     # Verify binary sensors
     cat_nearby = next(d for d in BINARY_SENSOR_DESCRIPTIONS if d.key == "cat_nearby")
     assert cat_nearby.is_on_fn(test_props) is True
@@ -212,7 +215,9 @@ def test_entity_descriptions():
     assert waste_bin.is_on_fn(test_props) is True
 
     food_empty = next(d for d in BINARY_SENSOR_DESCRIPTIONS if d.key == "food_empty")
-    assert food_empty.is_on_fn(test_props) is True
+    assert food_empty.is_on_fn(test_props) is False
+    assert food_empty.is_on_fn({"food_remain_status": 1}) is True
+    assert food_empty.is_on_fn({"food_remain_status": True}) is True
 
     # Verify numbers
     lamp_b = next(d for d in NUMBER_DESCRIPTIONS if d.key == "lamp_brightness")

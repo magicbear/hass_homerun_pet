@@ -163,6 +163,15 @@ SENSOR_DESCRIPTIONS: List[HomerunSensorEntityDescription] = [
             else p.get("desiccant_info")
         ),
     ),
+    HomerunSensorEntityDescription(
+        key="exception_messages",
+        name="异常报警",
+        property_key="exception_messages",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement="条",
+        icon="mdi:alert-circle",
+        value_fn=lambda p: len(p.get("exception_messages") or []),
+    ),
 ]
 
 
@@ -212,3 +221,20 @@ class HomerunSensor(HomerunBaseEntity, SensorEntity):
     def native_value(self) -> Any:
         """Return the value reported by the sensor."""
         return self.entity_description.value_fn(self.properties)
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Expose the full active warning list for the exception sensor."""
+        if self.entity_description.key != "exception_messages":
+            return {}
+
+        items = self.properties.get("exception_messages") or []
+        messages = [
+            str(item.get("detailsTopDes"))
+            for item in items
+            if isinstance(item, dict) and item.get("detailsTopDes")
+        ]
+        return {
+            "messages": messages,
+            "warnings": items,
+        }

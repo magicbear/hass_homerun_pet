@@ -145,10 +145,15 @@ class HomerunDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Dict[str, Any
         if not serial:
             return {}
 
-        properties, details = await asyncio.gather(
+        properties, details, exceptions = await asyncio.gather(
             self.client.async_get_device_properties(serial),
             self.client.async_get_device_info(serial),
+            self.client.async_get_device_exceptions(serial),
         )
+
+        # Keep the server-provided, localized warning text. This is the same
+        # list rendered by the official app's exception dialog.
+        properties["exception_messages"] = exceptions
 
         # The list API identifies the parent appliance, while the detail API
         # carries cameraList with the Ezviz child serial used by the official app.

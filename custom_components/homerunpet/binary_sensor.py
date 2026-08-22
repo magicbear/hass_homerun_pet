@@ -65,7 +65,9 @@ BINARY_SENSOR_DESCRIPTIONS: List[HomerunBinarySensorEntityDescription] = [
         property_key="food_remain_status",
         device_class=BinarySensorDeviceClass.PROBLEM,
         icon="mdi:food-drumstick-off",
-        is_on_fn=lambda p: bool(p.get("food_remain_status") == 0 or p.get("food_remain_status") is False),
+        # The official app reads this value from the device's ``LackFood``
+        # boolean property: false/0 means normal and true/1 means low food.
+        is_on_fn=lambda p: p.get("food_remain_status") in (True, 1, "1", "true", "True"),
     ),
     HomerunBinarySensorEntityDescription(
         key="power_connected",

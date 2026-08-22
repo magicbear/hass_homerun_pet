@@ -686,6 +686,18 @@ class HomerunApiClient:
             _LOGGER.debug("Failed to fetch dynamics for %s on %s: %s", device_serial, do_date, err)
         return []
 
+    async def async_get_device_exceptions(
+        self, device_serial: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch the active device warnings shown by the official app."""
+        res = await self._request_legacy(
+            "/app/v1/devicesExceptionStatus/list",
+            {"deviceSerial": device_serial},
+        )
+        if isinstance(res, dict) and isinstance(res.get("list"), list):
+            return [item for item in res["list"] if isinstance(item, dict)]
+        return []
+
     async def async_get_storage_download_url(self, storage_id: str) -> Optional[str]:
         """Fetch video / clip download URL from cloud storage ID."""
         if not storage_id:
