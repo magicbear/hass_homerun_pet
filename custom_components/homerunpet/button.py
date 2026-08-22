@@ -186,7 +186,7 @@ class HomerunButton(HomerunBaseEntity, ButtonEntity):
             portion = self.get_property("portion", 1)
             params = {"portion": int(portion)}
 
-        await self.coordinator.client.async_invoke_service(
+        await self.coordinator.async_invoke_service(
             self.serial, service_id, params
         )
         await self.coordinator.async_request_refresh()

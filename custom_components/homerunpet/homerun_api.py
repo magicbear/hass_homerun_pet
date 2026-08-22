@@ -540,19 +540,8 @@ class HomerunApiClient:
     async def async_set_device_properties(
         self, device_serial: str, properties: Dict[str, Any]
     ) -> bool:
-        """Send property updates to device."""
+        """Send property updates to device via OTAP control."""
         _LOGGER.debug("Setting properties for %s: %s", device_serial, properties)
-        try:
-            # 1. Try modern v1 POST /v1/devices/{serial}/properties
-            payload = {"data": properties}
-            await self._request_v1_properties(
-                f"/v1/devices/{device_serial}/properties",
-                "POST",
-                json_data=payload,
-            )
-            return True
-        except Exception as err:
-            _LOGGER.debug("v1 properties post not supported for %s (%s), falling back to OTAP", device_serial, err)
 
         # OTAP Property Identifier and Category Mappings
         otap_map = {
@@ -567,6 +556,7 @@ class HomerunApiClient:
             "clog_detect_switch": ("BlockSensorSwitch", "global", "customDomain"),
             "next_feed_switch": ("CancelNextMeal", "PetFeederRes", "global"),
             "night_mode": ("NightMode", "global", "customDomain"),
+            "osd_time_switch": ("TimeWatermark", "global", "customDomain"),
             "desiccant_info": ("Desiccant", "global", "customDomain"),
             "light_switch": ("LightSwitch", "global", "customDomain"),
             "kitten_mode_switch": ("KittenProtection", "global", "customDomain"),
@@ -574,7 +564,7 @@ class HomerunApiClient:
             "auto_clean": ("AutoShovel", "global", "customDomain"),
         }
 
-        # 2. Fallback to OTAP control via /app/v1/devices/control
+        success = True
         for prop_k, prop_v in properties.items():
             otap_prop, res_cat, dom_id = otap_map.get(prop_k, (prop_k, "global", "customDomain"))
             
@@ -583,6 +573,8 @@ class HomerunApiClient:
                 body_str = "true" if prop_v else "false"
             elif isinstance(prop_v, (int, float)):
                 body_str = str(int(prop_v))
+            elif isinstance(prop_v, dict):
+                body_str = json.dumps(prop_v)
             else:
                 body_str = str(prop_v)
 
@@ -603,26 +595,19 @@ class HomerunApiClient:
                     "body": body_str,
                 }
                 await self._request_legacy("/app/v1/devices/control", control_data)
+            except HomerunAuthError:
+                raise
             except Exception as err:
                 _LOGGER.error("Failed to control device %s prop %s (OTAP %s): %s", device_serial, prop_k, otap_prop, err)
-                return False
-        return True
+                success = False
+
+        return success
 
     async def async_invoke_service(
         self, device_serial: str, service_id: str, params: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Invoke a device action service (e.g. remote_feed, remote_clean, filter_reset)."""
         _LOGGER.debug("Invoking service %s on %s with %s", service_id, device_serial, params)
-        try:
-            payload = {"data": params or {}}
-            await self._request_v1_properties(
-                f"/v1/devices/{device_serial}/service/{service_id}",
-                "POST",
-                json_data=payload,
-            )
-            return True
-        except Exception as err:
-            _LOGGER.debug("v1 service invocation not supported for %s %s (%s), falling back to OTAP", device_serial, service_id, err)
 
         otap_actions = {
             "remote_feed": ("ManualFeed", "PetFeederRes", "global"),
@@ -631,6 +616,7 @@ class HomerunApiClient:
             "restart": ("RemoteReboot", "global", "customDomain"),
             "remote_clean": ("GeneralCmd", "global", "customDomain"),
             "remote_level": ("GeneralCmd", "global", "customDomain"),
+            "temp_enable_camera": ("TempCamera", "global", "customDomain"),
         }
 
         act_ident, res_cat, dom_id = otap_actions.get(service_id, (service_id, "global", "customDomain"))
@@ -640,6 +626,8 @@ class HomerunApiClient:
             body_val = str(params.get("portion", 1)) if params else "1"
         elif service_id == "announce_feed_voice":
             body_val = "{}"
+        elif service_id == "desiccant_reset":
+            body_val = "1"
         else:
             body_val = json.dumps(params or {})
 
@@ -652,7 +640,6 @@ class HomerunApiClient:
             "actionIdentifier": act_ident,
         }
 
-        # Legacy fallback
         try:
             control_data = {
                 "url": "/api/v3/device/otap/action",
@@ -662,6 +649,8 @@ class HomerunApiClient:
             }
             await self._request_legacy("/app/v1/devices/control", control_data)
             return True
+        except HomerunAuthError:
+            raise
         except Exception as err:
             _LOGGER.error("Service OTAP invocation failed for %s (%s): %s", service_id, act_ident, err)
             return False

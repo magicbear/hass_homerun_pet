@@ -147,7 +147,7 @@ class HomerunNumber(HomerunBaseEntity, NumberEntity):
         """Set new value."""
         prop_key = self.entity_description.property_key
         int_val = int(value)
-        await self.coordinator.client.async_set_device_properties(
+        await self.coordinator.async_set_device_properties(
             self.serial, {prop_key: int_val}
         )
         self.properties[prop_key] = int_val

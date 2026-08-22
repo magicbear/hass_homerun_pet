@@ -167,3 +167,23 @@ class HomerunDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Dict[str, Any
             "device": merged_device,
             "properties": properties or {},
         }
+
+    async def async_set_device_properties(
+        self, device_serial: str, properties: Dict[str, Any]
+    ) -> bool:
+        """Send property updates to device with automatic re-auth on token expiration."""
+        try:
+            return await self.client.async_set_device_properties(device_serial, properties)
+        except HomerunAuthError:
+            await self._async_reauth()
+            return await self.client.async_set_device_properties(device_serial, properties)
+
+    async def async_invoke_service(
+        self, device_serial: str, service_id: str, params: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Invoke a device service with automatic re-auth on token expiration."""
+        try:
+            return await self.client.async_invoke_service(device_serial, service_id, params)
+        except HomerunAuthError:
+            await self._async_reauth()
+            return await self.client.async_invoke_service(device_serial, service_id, params)

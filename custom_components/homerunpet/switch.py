@@ -52,7 +52,11 @@ SWITCH_DESCRIPTIONS: List[HomerunSwitchEntityDescription] = [
         property_key="night_mode",
         entity_category=EntityCategory.CONFIG,
         icon="mdi:weather-night",
-        is_on_fn=lambda p: bool(p.get("night_mode")),
+        is_on_fn=lambda p: bool(
+            p.get("night_mode", {}).get("switch")
+            if isinstance(p.get("night_mode"), dict)
+            else p.get("night_mode")
+        ),
     ),
     HomerunSwitchEntityDescription(
         key="auto_clean",
@@ -240,19 +244,31 @@ class HomerunSwitch(HomerunBaseEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
         prop_key = self.entity_description.property_key
-        await self.coordinator.client.async_set_device_properties(
-            self.serial, {prop_key: True}
+        current_val = self.properties.get(prop_key)
+        if isinstance(current_val, dict):
+            new_val = dict(current_val)
+            new_val["switch"] = True
+        else:
+            new_val = True
+        await self.coordinator.async_set_device_properties(
+            self.serial, {prop_key: new_val}
         )
-        self.properties[prop_key] = True
+        self.properties[prop_key] = new_val
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
         prop_key = self.entity_description.property_key
-        await self.coordinator.client.async_set_device_properties(
-            self.serial, {prop_key: False}
+        current_val = self.properties.get(prop_key)
+        if isinstance(current_val, dict):
+            new_val = dict(current_val)
+            new_val["switch"] = False
+        else:
+            new_val = False
+        await self.coordinator.async_set_device_properties(
+            self.serial, {prop_key: new_val}
         )
-        self.properties[prop_key] = False
+        self.properties[prop_key] = new_val
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
