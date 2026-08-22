@@ -1,0 +1,71 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "连接霍曼宠物云端",
+        "description": "请输入您的霍曼宠物账号密码，以自动发现并控制绑定的宠物智能设备。",
+        "data": {
+          "account_type": "账号类型",
+          "region": "服务器区域",
+          "area_code": "国家/地区区号",
+          "username": "手机号码或邮箱",
+          "password": "登录密码"
+        }
+      },
+      "family": {
+        "title": "选择关联家庭",
+        "description": "检测到您的账号拥有多个家庭，请选择要导入设备的家庭：",
+        "data": {
+          "family_id": "家庭列表"
+        }
+      },
+      "reauth_confirm": {
+        "title": "霍曼宠物重新认证",
+        "description": "账号凭证已失效，请重新输入账号 {username} 的密码以恢复连接。",
+        "data": {
+          "password": "登录密码"
+        }
+      },
+      "reconfigure": {
+        "title": "重新配置霍曼宠物",
+        "description": "修改您的霍曼宠物账号密码、服务器区域或手机区号：",
+        "data": {
+          "account_type": "账号类型",
+          "region": "服务器区域",
+          "area_code": "国家/地区区号",
+          "username": "手机号码或邮箱",
+          "password": "登录密码"
+        }
+      },
+      "reconfigure_family": {
+        "title": "重新选择关联家庭",
+        "description": "请选择要关联的霍曼家庭：",
+        "data": {
+          "family_id": "家庭列表"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "无法连接至霍曼云端服务器：{error_detail}",
+      "invalid_auth": "账号认证失败：{error_detail}",
+      "api_error": "{error_detail}",
+      "unknown": "发生未知错误：{error_detail}"
+    },
+    "abort": {
+      "already_configured": "该霍曼宠物账号已经配置过了。",
+      "reauth_successful": "重新认证成功！",
+      "reconfigure_successful": "重新配置已成功保存并重新加载！"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "霍曼宠物选项设置",
+        "description": "配置设备状态的云端轮询刷新间隔：",
+        "data": {
+          "scan_interval": "数据刷新周期（秒）"
+        }
+      }
+    }
+  }
+}

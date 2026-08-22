@@ -1,0 +1,71 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Homerunpet Cloud",
+        "description": "Enter your Homerunpet account credentials to discover and control your smart pet devices.",
+        "data": {
+          "account_type": "Account Type",
+          "region": "Server Region",
+          "area_code": "Country / Area Code",
+          "username": "Phone Number or Email",
+          "password": "Password"
+        }
+      },
+      "family": {
+        "title": "Select Family / Home",
+        "description": "Select the Homerunpet home/family you wish to import devices from.",
+        "data": {
+          "family_id": "Family / Home"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Homerunpet Account",
+        "description": "Your Homerunpet token has expired. Please re-enter the password for {username}.",
+        "data": {
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Homerunpet Account",
+        "description": "Update your Homerunpet credentials, server region, or phone area code:",
+        "data": {
+          "account_type": "Account Type",
+          "region": "Server Region",
+          "area_code": "Country / Area Code",
+          "username": "Phone Number or Email",
+          "password": "Password"
+        }
+      },
+      "reconfigure_family": {
+        "title": "Select Family / Home",
+        "description": "Select the Homerunpet home/family you wish to import devices from:",
+        "data": {
+          "family_id": "Family / Home"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Homerunpet cloud: {error_detail}",
+      "invalid_auth": "Authentication failed: {error_detail}",
+      "api_error": "{error_detail}",
+      "unknown": "An unexpected error occurred: {error_detail}"
+    },
+    "abort": {
+      "already_configured": "This Homerunpet account is already configured.",
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_successful": "Reconfiguration was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Homerunpet Options",
+        "description": "Configure cloud polling interval for device status updates.",
+        "data": {
+          "scan_interval": "Data Refresh Interval (seconds)"
+        }
+      }
+    }
+  }
+}

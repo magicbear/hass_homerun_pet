@@ -1,0 +1,11 @@
+{
+  "domain": "homerunpet",
+  "name": "霍曼宠物 / Homerunpet",
+  "codeowners": ["@magicbear"],
+  "config_flow": true,
+  "documentation": "https://github.com/magicbear/homeassistant-homerunpet",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "requirements": ["cryptography>=3.4.8"],
+  "version": "1.2.0"
+}
