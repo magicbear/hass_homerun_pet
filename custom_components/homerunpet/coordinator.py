@@ -25,6 +25,7 @@ from .const import (
 )
 from .homerun_api import (
     HomerunApiClient,
+    HomerunApiError,
     HomerunAuthError,
     HomerunConnectionError,
     HomerunError,
@@ -177,6 +178,21 @@ class HomerunDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Dict[str, Any
         except HomerunAuthError:
             await self._async_reauth()
             return await self.client.async_set_device_properties(device_serial, properties)
+
+    async def async_fetch_ez_token(self) -> Dict[str, Any]:
+        """Fetch a fresh Ezviz token on demand. Does not poll or refresh in the background."""
+        try:
+            token_data = await self.client.async_get_ez_token()
+        except HomerunAuthError:
+            await self._async_reauth()
+            token_data = await self.client.async_get_ez_token()
+
+        if not token_data.get("accessToken"):
+            detail = self.client.last_stream_error or "响应中没有 accessToken"
+            raise HomerunApiError(f"无法取得萤石鉴权 Token: {detail}")
+
+        self.ez_token_data = token_data
+        return token_data
 
     async def async_invoke_service(
         self, device_serial: str, service_id: str, params: Optional[Dict[str, Any]] = None

@@ -91,5 +91,25 @@
         }
       }
     }
+  },
+  "services": {
+    "get_ys7_credentials": {
+      "name": "获取萤石 YS7 凭证",
+      "description": "按需向霍曼云获取萤石 appKey、accessToken、摄像头序列号和域名，用于自行接入 SRS。仅在调用本服务时拉取 Token，不会在后台刷新。",
+      "fields": {
+        "device_id": {
+          "name": "设备",
+          "description": "目标霍曼摄像头。账号下只有一台摄像头时可省略。"
+        },
+        "entity_id": {
+          "name": "实体",
+          "description": "目标霍曼设备上的任意实体。"
+        },
+        "device_serial": {
+          "name": "设备序列号",
+          "description": "父设备序列号或萤石摄像头序列号。"
+        }
+      }
+    }
   }
 }

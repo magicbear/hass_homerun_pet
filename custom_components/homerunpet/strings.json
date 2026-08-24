@@ -91,5 +91,25 @@
         }
       }
     }
+  },
+  "services": {
+    "get_ys7_credentials": {
+      "name": "Get YS7 credentials",
+      "description": "Fetch Ezviz appKey, access token, camera serial, and domain on demand for self-hosted SRS. The token is requested only when this service is called.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "Homerun camera device. Optional when the account has only one camera."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "Any entity of the target Homerun device."
+        },
+        "device_serial": {
+          "name": "Device serial",
+          "description": "Parent appliance serial or Ezviz camera serial."
+        }
+      }
+    }
   }
 }

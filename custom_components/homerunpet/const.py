@@ -48,6 +48,15 @@ CONF_TOKEN: Final = "token"
 CONF_USER_ID: Final = "user_id"
 CONF_SCAN_INTERVAL: Final = "scan_interval"
 
+# On-demand YS7 / Ezviz credential service (for self-hosted SRS)
+SERVICE_GET_YS7_CREDENTIALS: Final = "get_ys7_credentials"
+ATTR_DEVICE_SERIAL: Final = "device_serial"
+ATTR_YS_APP_KEY: Final = "ys_app_key"
+ATTR_ACCESS_TOKEN: Final = "access_token"
+ATTR_CAMERA_SERIAL: Final = "camera_serial"
+ATTR_YS_DOMAIN: Final = "ys_domain"
+DEFAULT_YS_DOMAIN: Final = "https://open.ys7.com"
+
 ACCOUNT_TYPE_PHONE: Final = "phone"
 ACCOUNT_TYPE_EMAIL: Final = "email"
 
@@ -78,6 +87,16 @@ CATEGORY_PET_HEATER: Final = "PetHeater"
 CATEGORY_WATER_FOUNTAIN: Final = "WaterCamera"
 CATEGORY_CAMERA: Final = "C01_Camera"
 CATEGORY_FEED_RACK_CAMERA: Final = "FeedRackCamera"
+
+CAMERA_CATEGORIES: Final = {
+    CATEGORY_FEED_RACK_CAMERA,
+    CATEGORY_CAMERA,
+    CATEGORY_WATER_FOUNTAIN,
+    "FeedRackCamera",
+    "C01_Camera",
+    "SideboardCamera",
+    "WaterCamera",
+}
 
 # Known device model names
 DEVICE_CATEGORIES_NAMES: Final = {

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 # Mock homeassistant modules for testing if homeassistant is not in local python env
 for mod in [
+    "voluptuous",
     "homeassistant",
     "homeassistant.core",
     "homeassistant.config_entries",
@@ -100,17 +101,23 @@ from custom_components.homerunpet.const import (
     APP_ID,
     APP_KEY,
     APP_SECRET,
+    CAMERA_CATEGORIES,
     DOMAIN,
     MD5_SALT,
     EZ_TOKEN_IV,
     CATEGORY_CAT_LITTER_BOX,
     CATEGORY_FEEDER,
     CATEGORY_AIR_PURIFIER,
+    CATEGORY_CAMERA,
+    SERVICE_GET_YS7_CREDENTIALS,
 )
 from custom_components.homerunpet.homerun_api import (
     HomerunApiClient,
+    build_ys7_credentials,
+    camera_serial_from_device,
     decrypt_ezviz_token,
     hash_password,
+    is_camera_device,
     param_sign,
 )
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -237,8 +244,47 @@ def test_entity_descriptions():
     print("  All entity mapping checks passed!")
 
 
+def test_ys7_credentials_helpers():
+    """Verify Ezviz child serial extraction and on-demand credential payload."""
+    print("[5] Testing YS7 credential helpers...")
+    parent = "HRPARENT123"
+    child = "C98765432"
+    row = {
+        "serial": parent,
+        "device": {
+            "deviceSerial": parent,
+            "categ": CATEGORY_CAMERA,
+            "cameraList": [{"deviceSerial": child, "channelNo": 1}],
+        },
+        "properties": {"camera_switch": True},
+    }
+
+    assert camera_serial_from_device(row, parent) == child
+    assert camera_serial_from_device(row["device"], parent) == child
+    assert camera_serial_from_device({"deviceSerial": parent}, parent) == parent
+    assert is_camera_device(row["device"], row["properties"], camera_categories=CAMERA_CATEGORIES)
+
+    payload = build_ys7_credentials(
+        {
+            "ysAppKey": "ys-app-key",
+            "accessToken": "at.fresh-token",
+            "ysDomain": "https://open.ys7.com",
+        },
+        device_serial=parent,
+        device=row,
+    )
+    assert payload["ys_app_key"] == "ys-app-key"
+    assert payload["access_token"] == "at.fresh-token"
+    assert payload["camera_serial"] == child
+    assert payload["ys_domain"] == "https://open.ys7.com"
+    assert payload["device_serial"] == parent
+    assert SERVICE_GET_YS7_CREDENTIALS == "get_ys7_credentials"
+    print("  YS7 credential helper checks passed!")
+
+
 if __name__ == "__main__":
     test_crypto_algorithms()
     test_thing_models_loading()
     test_entity_descriptions()
-    print("\n🎉 ALL 4 TEST SUITES PASSED SUCCESSFULLY!")
+    test_ys7_credentials_helpers()
+    print("\n🎉 ALL 5 TEST SUITES PASSED SUCCESSFULLY!")

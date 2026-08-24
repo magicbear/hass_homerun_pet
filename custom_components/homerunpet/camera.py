@@ -16,28 +16,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import (
-    CATEGORY_CAMERA,
-    CATEGORY_CAT_LITTER_BOX,
-    CATEGORY_FEEDER,
-    CATEGORY_FEED_RACK_CAMERA,
-    CATEGORY_WATER_FOUNTAIN,
-    DOMAIN,
-)
+from .const import CAMERA_CATEGORIES, DOMAIN
 from .coordinator import HomerunDataUpdateCoordinator
 from .entity import HomerunBaseEntity
-from .homerun_api import HomerunApiError
+from .homerun_api import HomerunApiError, camera_serial_from_device, is_camera_device
 
 _LOGGER = logging.getLogger(__name__)
-
-CAMERA_CATEGORIES = {
-    CATEGORY_FEED_RACK_CAMERA,
-    CATEGORY_CAMERA,
-    "FeedRackCamera",
-    "C01_Camera",
-    "SideboardCamera",
-    "WaterCamera",
-}
 
 
 async def async_setup_entry(
@@ -53,7 +37,6 @@ async def async_setup_entry(
         for serial, dev_data in coordinator.data.items():
             dev = dev_data.get("device", {})
             props = dev_data.get("properties", {})
-            categ = dev.get("categ", "")
             thing_model = coordinator.client.get_device_thing_model(dev)
             model_props = {
                 p.get("identifier")
@@ -61,18 +44,7 @@ async def async_setup_entry(
                 if isinstance(p, dict)
             }
 
-            # Check if device is actually a camera device (e.g. video feeder, smart rack camera, etc.)
-            is_camera = (
-                categ in CAMERA_CATEGORIES
-                or dev.get("isCamera") == 1
-                or bool(dev.get("cameraList"))
-                or "camera_switch" in props
-                or "camera_switch" in model_props
-                or "ir_mode" in props
-                or "ir_mode" in model_props
-            )
-
-            if is_camera:
+            if is_camera_device(dev, props, model_props, CAMERA_CATEGORIES):
                 entities.append(HomerunCamera(coordinator, serial))
 
     async_add_entities(entities)
@@ -115,12 +87,7 @@ class HomerunCamera(HomerunBaseEntity, Camera):
     @property
     def camera_serial(self) -> str:
         """Return the Ezviz child serial used by the official app."""
-        camera_list = self.device_raw_data.get("cameraList") or []
-        if camera_list and isinstance(camera_list[0], dict):
-            child_serial = camera_list[0].get("deviceSerial")
-            if child_serial:
-                return str(child_serial)
-        return self.serial
+        return camera_serial_from_device(self.device_raw_data, self.serial)
 
     async def stream_source(self) -> Optional[str]:
         """Return a standard stream URL for HA Stream and its go2rtc provider."""

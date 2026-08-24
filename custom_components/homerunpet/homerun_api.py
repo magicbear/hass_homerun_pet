@@ -21,7 +21,13 @@ from .const import (
     API_HOSTS,
     APP_ID,
     APP_KEY,
+    ATTR_ACCESS_TOKEN,
+    ATTR_CAMERA_SERIAL,
+    ATTR_DEVICE_SERIAL,
+    ATTR_YS_APP_KEY,
+    ATTR_YS_DOMAIN,
     DEFAULT_REGION,
+    DEFAULT_YS_DOMAIN,
     EZ_TOKEN_IV,
     MD5_SALT,
     REGION_CN,
@@ -104,6 +110,71 @@ def decrypt_ezviz_token(encrypted_token: str) -> str:
     padded = decryptor.update(encrypted) + decryptor.finalize()
     unpadder = PKCS7(algorithms.AES.block_size).unpadder()
     return (unpadder.update(padded) + unpadder.finalize()).decode("utf-8")
+
+
+def is_camera_device(
+    dev: Dict[str, Any],
+    props: Optional[Dict[str, Any]] = None,
+    model_props: Optional[Any] = None,
+    camera_categories: Optional[Any] = None,
+) -> bool:
+    """Return True when a Homerun device exposes an Ezviz camera."""
+    props = props or {}
+    model_props = model_props or set()
+    categ = dev.get("categ", "")
+    if camera_categories and categ in camera_categories:
+        return True
+    return (
+        dev.get("isCamera") == 1
+        or bool(dev.get("cameraList"))
+        or "camera_switch" in props
+        or "camera_switch" in model_props
+        or "ir_mode" in props
+        or "ir_mode" in model_props
+    )
+
+
+def camera_serial_from_device(
+    device: Dict[str, Any], fallback_serial: str = ""
+) -> str:
+    """Return the Ezviz child serial used by live streaming / SRS.
+
+    Accepts either a raw device payload or a coordinator row
+    ``{device, properties}``. Prefer ``cameraList[0].deviceSerial``
+    (child camera) over the parent appliance serial.
+    """
+    sources: List[Dict[str, Any]] = [device]
+    nested = device.get("device")
+    if isinstance(nested, dict):
+        sources.append(nested)
+
+    for src in sources:
+        camera_list = src.get("cameraList") or []
+        if isinstance(camera_list, list) and camera_list:
+            first = camera_list[0]
+            if isinstance(first, dict):
+                child = first.get("deviceSerial")
+                if child:
+                    return str(child)
+    return str(fallback_serial or "")
+
+
+def build_ys7_credentials(
+    token_data: Dict[str, Any],
+    *,
+    device_serial: str,
+    device: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build the read-only YS7 payload used by the HA service and SRS."""
+    camera_serial = camera_serial_from_device(device or {}, device_serial)
+    domain = token_data.get("ysDomain") or DEFAULT_YS_DOMAIN
+    return {
+        ATTR_YS_APP_KEY: str(token_data.get("ysAppKey") or ""),
+        ATTR_ACCESS_TOKEN: str(token_data.get("accessToken") or ""),
+        ATTR_CAMERA_SERIAL: camera_serial,
+        ATTR_YS_DOMAIN: str(domain),
+        ATTR_DEVICE_SERIAL: device_serial,
+    }
 
 
 class HomerunApiClient:
@@ -360,6 +431,8 @@ class HomerunApiClient:
                 res = dict(res)
                 res["accessToken"] = decrypt_ezviz_token(str(token))
             return res
+        except HomerunAuthError:
+            raise
         except Exception as err:
             self.last_stream_error = f"HomeRun ezToken 获取或解密失败: {err}"
             _LOGGER.warning("Could not fetch or decrypt Ezviz token: %s", err)
