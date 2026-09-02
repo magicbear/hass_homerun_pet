@@ -34,8 +34,24 @@ API_HOSTS: Final = {
     REGION_EU: "https://euapi.homerunsmart.com",
 }
 
+# Modern app API hosts used by the v2 Android app (HMAC-signed REST).
+# Mirrors com.homerunpet.common.Utils.mapApiDomain from the APK.
+APP_API_HOSTS: Final = {
+    REGION_CN: "https://app.homerunsmartapi.com",
+    REGION_US: "https://us-app.homerunsmartapi.com",
+    REGION_EU: "https://eu-app.homerunsmartapi.com",
+}
+
 DEFAULT_REGION: Final = REGION_CN
 DEFAULT_SCAN_INTERVAL_SEC: Final = 30
+
+# The family device list only changes when devices are paired/removed, so it
+# is cached and re-fetched at most once per TTL instead of every scan cycle.
+DEVICES_LIST_TTL_SEC: Final = 600
+
+# When the modern properties API fails for a device, the legacy per-property
+# OTAP fallback is throttled to at most one run per cooldown.
+OTAP_FALLBACK_COOLDOWN_SEC: Final = 600
 
 # Configuration keys
 CONF_ACCOUNT_TYPE: Final = "account_type"

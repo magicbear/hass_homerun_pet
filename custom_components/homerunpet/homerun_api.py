@@ -4,14 +4,16 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import logging
 import os
 import ssl
 import time
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import aiohttp
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -19,8 +21,10 @@ from cryptography.hazmat.primitives.padding import PKCS7
 
 from .const import (
     API_HOSTS,
+    APP_API_HOSTS,
     APP_ID,
     APP_KEY,
+    APP_SECRET,
     ATTR_ACCESS_TOKEN,
     ATTR_CAMERA_SERIAL,
     ATTR_DEVICE_SERIAL,
@@ -30,7 +34,9 @@ from .const import (
     DEFAULT_YS_DOMAIN,
     EZ_TOKEN_IV,
     MD5_SALT,
+    OTAP_FALLBACK_COOLDOWN_SEC,
     REGION_CN,
+    X_APPLICATION_ID,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -192,9 +198,12 @@ class HomerunApiClient:
         self._close_session = False
         self._region = region
         self._base_url = API_HOSTS.get(region, API_HOSTS[DEFAULT_REGION])
+        self._app_base_url = APP_API_HOSTS.get(region, APP_API_HOSTS[DEFAULT_REGION])
         self._token = token
         self._user_id = user_id
         self._thing_models: Dict[str, Any] = load_cached_thing_models()
+        self._device_id = uuid.uuid4().hex
+        self._otap_fallback_until: Dict[str, float] = {}
         self.last_stream_error: Optional[str] = None
 
     @property
@@ -303,48 +312,87 @@ class HomerunApiClient:
         except asyncio.TimeoutError as err:
             raise HomerunConnectionError(f"Timeout requesting {url}") from err
 
-    async def _request_v1_properties(
+    async def _request_app(
         self,
-        endpoint: str,
-        method: str = "GET",
-        json_data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """Make a request to /v1/devices/.../properties."""
-        session = await self._get_session()
-        url = f"{self._base_url}{endpoint}"
+        method: str,
+        path: str,
+        json_body: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Signed request against the modern app API.
 
+        Replicates the v2 Android app protocol (EncryptDataInterceptor +
+        GlobalHeaderInterceptor): every request is HMAC-SHA256 signed with the
+        shared APP_SECRET. Unlike the legacy host this API exposes batch
+        endpoints such as GET/POST /v1/devices/{serial}/properties.
+        """
+        session = await self._get_session()
+        url = f"{self._app_base_url}{path}"
+        body = json.dumps(json_body) if json_body is not None else ""
+        ts = str(int(time.time()))
+        nonce = uuid.uuid4().hex[:16]
+        content_type = "application/json"
+        content_sha = hashlib.sha256(body.encode()).hexdigest()
+        encoded_path = quote(path, safe="~").replace("*", "%2A")
+        sign_payload = "\n".join(
+            [
+                method.upper(),
+                encoded_path,
+                "",
+                f"x-sign-nonce:{nonce}",
+                f"x-sign-timestamp:{ts}",
+                f"x-content-sha256:{content_sha}",
+                f"content-type:{content_type}",
+                content_sha,
+            ]
+        )
         headers = {
-            "Content-Type": "application/json",
             "Authorization": self._token or "",
-            "x-token": self._token or "",
-            "x-lang": "zh_CN" if self._region == REGION_CN else "en_US",
+            "X-Application-Id": X_APPLICATION_ID,
+            "X-Client-Platform": "Android",
+            "X-Client-OS-Version": "Android",
+            "X-Client-App-Version": "2.5.0",
+            "X-Client-Device-Model": "HomeAssistant",
+            "X-Client-Device-Brand": "HomeAssistant",
+            "X-Client-Device-Id": self._device_id,
+            "X-Client-Time-Zone": "UTC",
+            "Accept-Language": "zh_CN" if self._region == REGION_CN else "en_US",
+            "Content-Type": content_type,
+            "X-Signature": hmac.new(
+                APP_SECRET.encode(), sign_payload.encode(), hashlib.sha256
+            ).hexdigest(),
+            "X-Sign-Timestamp": ts,
+            "X-Sign-Nonce": nonce,
         }
 
         try:
             async with session.request(
-                method, url, json=json_data, headers=headers, timeout=aiohttp.ClientTimeout(total=15)
+                method,
+                url,
+                data=body.encode() if body else None,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=15),
             ) as resp:
                 raw_bytes = await resp.read()
                 text = raw_bytes.decode("utf-8", errors="replace")
                 if resp.status == 401:
-                    raise HomerunAuthError("Token expired (401)")
+                    raise HomerunAuthError("Token expired or unauthorized (401)")
+                if resp.status == 403:
+                    raise HomerunApiError(f"App API rejected request (403): {text[:120]}")
                 if resp.status not in (200, 201):
-                    raise HomerunConnectionError(f"HTTP error {resp.status}: {text}")
+                    raise HomerunConnectionError(f"HTTP error {resp.status}: {text[:120]}")
 
                 try:
                     res_json = json.loads(text)
                 except json.JSONDecodeError as err:
-                    raise HomerunApiError(f"Invalid JSON response: {text}") from err
+                    raise HomerunApiError(f"Invalid JSON response: {text[:120]}") from err
 
-                # The v1 endpoints return either {"code": 200, "data": ...} or direct payload
-                if isinstance(res_json, dict) and "code" in res_json:
-                    code = str(res_json.get("code"))
-                    if code not in ("200", "0"):
-                        msg = res_json.get("msg", "")
-                        raise HomerunApiError(msg if msg else f"API错误 ({code})")
-                    return res_json.get("data", {})
-
-                return res_json
+            if isinstance(res_json, dict) and res_json.get("error_code"):
+                raise HomerunApiError(
+                    f"App API error: {res_json.get('error_code')} {res_json.get('error_msg', '')}"
+                )
+            if isinstance(res_json, dict) and "data" in res_json:
+                return res_json.get("data")
+            return res_json
 
         except aiohttp.ClientError as err:
             raise HomerunConnectionError(f"Connection error requesting {url}: {err}") from err
@@ -537,14 +585,30 @@ class HomerunApiClient:
             return {}
 
     async def async_get_device_properties(self, device_serial: str) -> Dict[str, Any]:
-        """Fetch current telemetry / property values for a device."""
+        """Fetch current telemetry / property values for a device.
+
+        Uses the modern app API which returns every property in a single
+        request. The legacy per-property OTAP tunnel is only used as a
+        throttled fallback when that fails.
+        """
         try:
-            # 1. Try modern v1 REST property endpoint
-            data = await self._request_v1_properties(f"/v1/devices/{device_serial}/properties", "GET")
-            if isinstance(data, dict) and data:
+            data = await self._request_app("GET", f"/v1/devices/{device_serial}/properties")
+            if isinstance(data, dict):
                 return data
+            return {}
+        except HomerunAuthError:
+            raise
         except Exception as err:
-            _LOGGER.debug("v1 properties get not supported for %s (%s), querying OTAP properties", device_serial, err)
+            _LOGGER.debug(
+                "Modern properties API failed for %s (%s), using OTAP fallback",
+                device_serial,
+                err,
+            )
+
+        # 1. The legacy OTAP tunnel queries one property per request, so only
+        # run it once per cooldown to avoid ~19 control calls every cycle.
+        if time.monotonic() < self._otap_fallback_until.get(device_serial, 0.0):
+            return {}
 
         # 2. Query basic info
         result_props: Dict[str, Any] = {}
@@ -608,14 +672,38 @@ class HomerunApiClient:
             if ha_v is not None:
                 result_props[ha_k] = ha_v
 
+        self._otap_fallback_until[device_serial] = (
+            time.monotonic() + OTAP_FALLBACK_COOLDOWN_SEC
+        )
+
         return result_props
 
     async def async_set_device_properties(
         self, device_serial: str, properties: Dict[str, Any]
     ) -> bool:
-        """Send property updates to device via OTAP control."""
+        """Send property updates to device, modern API first with OTAP fallback."""
         _LOGGER.debug("Setting properties for %s: %s", device_serial, properties)
 
+        try:
+            await self._request_app(
+                "POST", f"/v1/devices/{device_serial}/properties", {"data": properties}
+            )
+            return True
+        except HomerunAuthError:
+            raise
+        except Exception as err:
+            _LOGGER.debug(
+                "Modern property write failed for %s (%s), using OTAP control",
+                device_serial,
+                err,
+            )
+
+        return await self._set_device_properties_otap(device_serial, properties)
+
+    async def _set_device_properties_otap(
+        self, device_serial: str, properties: Dict[str, Any]
+    ) -> bool:
+        """Send property updates to device via OTAP control."""
         # OTAP Property Identifier and Category Mappings
         otap_map = {
             "detect_presence_switch": ("CatDetect", "global", "customDomain"),

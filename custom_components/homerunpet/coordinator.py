@@ -4,7 +4,8 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 import logging
-from typing import Any, Dict
+import time
+from typing import Any, Dict, List, Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -20,6 +21,7 @@ from .const import (
     CONF_REGION,
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
+    DEVICES_LIST_TTL_SEC,
     DEFAULT_SCAN_INTERVAL_SEC,
     DOMAIN,
 )
@@ -50,6 +52,9 @@ class HomerunDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Dict[str, Any
         self.entry = entry
         self.family_id = entry.data.get(CONF_FAMILY_ID)
         self.ez_token_data: Dict[str, Any] = {}
+        self._devices_cache: Optional[List[Dict[str, Any]]] = None
+        self._devices_fetched_at: float = 0.0
+        self._device_details: Dict[str, Dict[str, Any]] = {}
 
         scan_interval = entry.options.get(
             CONF_SCAN_INTERVAL,
@@ -94,8 +99,20 @@ class HomerunDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Dict[str, Any
                 _LOGGER.warning("No families found for Homerunpet account")
                 return {}
 
-            # Fetch list of devices in family
-            devices_list = await self.client.async_get_devices(int(self.family_id))
+            # The family device list only changes when devices are paired or
+            # removed, so keep it cached and re-fetch at most once per TTL.
+            now = time.monotonic()
+            if (
+                self._devices_cache is None
+                or (now - self._devices_fetched_at) > DEVICES_LIST_TTL_SEC
+            ):
+                devices_list = await self.client.async_get_devices(int(self.family_id))
+                self._devices_fetched_at = now
+                self._device_details.clear()
+                if devices_list:
+                    self._devices_cache = devices_list
+
+            devices_list = self._devices_cache or []
             if not devices_list:
                 return {}
 
@@ -138,6 +155,12 @@ class HomerunDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Dict[str, Any
         except Exception as err:
             raise UpdateFailed(f"Unexpected error: {err}") from err
 
+    async def async_refresh_devices(self) -> None:
+        """Invalidate the cached device list and refresh all data."""
+        self._devices_cache = None
+        self._device_details.clear()
+        await self.async_request_refresh()
+
     async def _fetch_device_info_and_properties(
         self, dev_info: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -146,14 +169,22 @@ class HomerunDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Dict[str, Any
         if not serial:
             return {}
 
-        properties, details, exceptions = await asyncio.gather(
+        # Full device details (cameraList etc.) change as rarely as the device
+        # list itself, so only fetch them once per device-list refresh.
+        details = self._device_details.get(serial)
+        if details is None:
+            details = await self.client.async_get_device_info(serial)
+            if details:
+                self._device_details[serial] = details
+
+        properties, exceptions = await asyncio.gather(
             self.client.async_get_device_properties(serial),
-            self.client.async_get_device_info(serial),
             self.client.async_get_device_exceptions(serial),
         )
 
         # Keep the server-provided, localized warning text. This is the same
         # list rendered by the official app's exception dialog.
+        properties = dict(properties or {})
         properties["exception_messages"] = exceptions
 
         # The list API identifies the parent appliance, while the detail API
@@ -166,7 +197,7 @@ class HomerunDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Dict[str, Any
         return {
             "serial": serial,
             "device": merged_device,
-            "properties": properties or {},
+            "properties": properties,
         }
 
     async def async_set_device_properties(
