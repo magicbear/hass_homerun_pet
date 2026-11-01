@@ -1,10 +1,13 @@
 """Camera platform for Homerunpet (霍曼宠物) integration."""
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
-import aiohttp
+from go2rtc_client import Go2RtcRestClient
 
 from homeassistant.components.camera import (
     Camera,
@@ -12,6 +15,7 @@ from homeassistant.components.camera import (
     CameraEntityFeature,
 )
 from homeassistant.components.camera.const import StreamType
+from homeassistant.components.go2rtc.const import HA_MANAGED_URL
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -67,7 +71,11 @@ class HomerunCamera(HomerunBaseEntity, Camera):
         Camera.__init__(self)
         self._attr_name = "摄像头实时画面"
         self._attr_icon = "mdi:cctv"
-        self._cached_image: Optional[bytes] = None
+        self._source_lock = asyncio.Lock()
+        self._live_source: Optional[str] = None
+        self._source_expires = 0.0
+        relay_id = hashlib.sha256(serial.encode()).hexdigest()[:12]
+        self._relay_name = f"homerunpet_relay_{relay_id}"
 
     @property
     def use_stream_for_stills(self) -> bool:
@@ -76,12 +84,7 @@ class HomerunCamera(HomerunBaseEntity, Camera):
 
     @property
     def camera_capabilities(self) -> CameraCapabilities:
-        """Expose only WebRTC because the source is transcoded by go2rtc.
-
-        Home Assistant's HLS pipeline cannot consume go2rtc's ``ffmpeg:``
-        producer syntax. Advertising HLS makes the frontend select that broken
-        path even though the go2rtc WebRTC provider can play it correctly.
-        """
+        """Use go2rtc for browser playback of the H.264 relay."""
         return CameraCapabilities({StreamType.WEB_RTC})
 
     @property
@@ -89,14 +92,45 @@ class HomerunCamera(HomerunBaseEntity, Camera):
         """Return the Ezviz child serial used by the official app."""
         return camera_serial_from_device(self.device_raw_data, self.serial)
 
+    def _relay_client(self) -> Go2RtcRestClient:
+        """Use the go2rtc instance managed by this Home Assistant."""
+        config = self.hass.data.get("go2rtc")
+        if config is None:
+            raise HomerunApiError("Home Assistant go2rtc is not ready")
+        return Go2RtcRestClient(config.session, config.url)
+
     async def stream_source(self) -> Optional[str]:
-        """Return a standard stream URL for HA Stream and its go2rtc provider."""
+        """Expose a standard RTSP URL usable by HomeKit and HA alike.
+
+        The upstream ffmpeg: producer syntax is interpreted only by go2rtc.
+        HomeKit invokes FFmpeg directly, so register that producer internally
+        and return its H.264 relay instead. Port 18554 belongs to HA's
+        built-in go2rtc instance; an external go2rtc needs its own RTSP port.
+        """
+        async with self._source_lock:
+            if not self._live_source or time.monotonic() >= self._source_expires:
+                self._live_source = await self._async_cloud_stream_source()
+                self._source_expires = time.monotonic() + 3000
+            source = f"ffmpeg:{self._live_source}#video=h264#audio=opus"
+            client = self._relay_client()
+            streams = await client.streams.list()
+            stream = streams.get(self._relay_name)
+            if stream is None or not any(p.url == source for p in stream.producers):
+                await client.streams.add(self._relay_name, [source])
+            if self.hass.data["go2rtc"].url == HA_MANAGED_URL:
+                return f"rtsp://127.0.0.1:18554/{self._relay_name}"
+            # External go2rtc instances may use a different RTSP listener.
+            # Preserve their existing WebRTC source until that port is configurable.
+            return source
+
+    async def _async_cloud_stream_source(self) -> str:
+        """Resolve the expiring cloud source without exposing tokens in state."""
         token_data = self.coordinator.ez_token_data or {}
         source = await self.coordinator.client.async_get_ezviz_live_url(
             self.camera_serial, token_data
         )
         if source:
-            return f"ffmpeg:{source}#video=h264#audio=opus"
+            return source
 
         # The Ezviz token can expire independently from the HomeRun login token.
         token_data = await self.coordinator.client.async_get_ez_token()
@@ -108,7 +142,7 @@ class HomerunCamera(HomerunBaseEntity, Camera):
             self.camera_serial, token_data
         )
         if source:
-            return f"ffmpeg:{source}#video=h264#audio=opus"
+            return source
 
         detail = self.coordinator.client.last_stream_error or "未知错误"
         raise HomerunApiError(f"无法取得萤石直播地址: {detail}")
@@ -116,30 +150,17 @@ class HomerunCamera(HomerunBaseEntity, Camera):
     async def async_camera_image(
         self, width: Optional[int] = None, height: Optional[int] = None
     ) -> Optional[bytes]:
-        """Return bytes of camera image or snapshot."""
-        if self._cached_image:
-            return self._cached_image
-
-        pic_url = self.device_raw_data.get("pic") or self.device_raw_data.get("pic1")
-        if pic_url:
-            try:
-                session = await self.coordinator.client._get_session()
-                async with session.get(pic_url, timeout=aiohttp.ClientTimeout(total=3)) as resp:
-                    if resp.status == 200:
-                        self._cached_image = await resp.read()
-                        return self._cached_image
-            except Exception as err:
-                _LOGGER.debug("Failed to fetch camera snapshot for %s: %s", self.serial, err)
-
-        # Fast fallback 1x1 JPEG so HA /api/camera_proxy never blocks or raises HTTP 500
-        return (
-            b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00"
-            b"\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12"
-            b"\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.' \",#\x1c\x1c(7),01444\x1f'9=82<.342"
-            b"\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05"
-            b"\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07"
-            b"\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xff\xd9"
-        )
+        """Return a fresh frame from the same relay used for live video."""
+        try:
+            async with asyncio.timeout(20):
+                await self.stream_source()
+                return await self._relay_client().get_jpeg_snapshot(
+                    self._relay_name, width, height
+                )
+        except Exception as err:
+            # Cloud URLs contain credentials; log only the exception type.
+            _LOGGER.warning("Camera snapshot failed: %s", type(err).__name__)
+            return None
 
     @property
     def is_on(self) -> bool:
