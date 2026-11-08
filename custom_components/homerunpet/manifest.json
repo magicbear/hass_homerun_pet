@@ -6,7 +6,7 @@
   "documentation": "https://github.com/magicbear/homeassistant-homerunpet",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "dependencies": ["go2rtc"],
+  "after_dependencies": ["go2rtc"],
   "requirements": ["cryptography>=3.4.8"],
   "version": "1.3.0"
 }

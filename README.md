@@ -63,6 +63,12 @@ Click **Configure / Options** on the integration page to adjust the background c
 
 ---
 
+## Camera playback and HomeKit
+
+Live video and snapshots require a working HA `go2rtc` integration; other device functions remain available without it. HomeKit requires **HA-managed go2rtc** (HA OS / Container); external go2rtc supports HA playback only. For non-Docker installations, configure an external URL in HA's go2rtc integration.
+
+---
+
 ## 🛠️ Architecture & Protocol Details
 
 - **Authentication**: Uses salted MD5 password hashing with client-side SHA256 parameter signature generation replicating Homerunpet APK version 1.3.1+.

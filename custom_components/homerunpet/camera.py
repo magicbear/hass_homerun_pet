@@ -5,9 +5,7 @@ import asyncio
 import hashlib
 import logging
 import time
-from typing import Any, Dict, List, Optional
-
-from go2rtc_client import Go2RtcRestClient
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from homeassistant.components.camera import (
     Camera,
@@ -15,15 +13,18 @@ from homeassistant.components.camera import (
     CameraEntityFeature,
 )
 from homeassistant.components.camera.const import StreamType
-from homeassistant.components.go2rtc.const import HA_MANAGED_URL
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CAMERA_CATEGORIES, DOMAIN
 from .coordinator import HomerunDataUpdateCoordinator
 from .entity import HomerunBaseEntity
 from .homerun_api import HomerunApiError, camera_serial_from_device, is_camera_device
+
+if TYPE_CHECKING:
+    from go2rtc_client import Go2RtcRestClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,6 +52,11 @@ async def async_setup_entry(
             if is_camera_device(dev, props, model_props, CAMERA_CATEGORIES):
                 entities.append(HomerunCamera(coordinator, serial))
 
+    if entities and hass.data.get("go2rtc") is None:
+        _LOGGER.warning(
+            "Homerunpet camera streaming and snapshots require a running HA go2rtc "
+            "integration; camera controls and other device functions remain available"
+        )
     async_add_entities(entities)
 
 
@@ -85,6 +91,8 @@ class HomerunCamera(HomerunBaseEntity, Camera):
     @property
     def camera_capabilities(self) -> CameraCapabilities:
         """Use go2rtc for browser playback of the H.264 relay."""
+        if self.hass.data.get("go2rtc") is None:
+            return CameraCapabilities(set())
         return CameraCapabilities({StreamType.WEB_RTC})
 
     @property
@@ -93,10 +101,20 @@ class HomerunCamera(HomerunBaseEntity, Camera):
         return camera_serial_from_device(self.device_raw_data, self.serial)
 
     def _relay_client(self) -> Go2RtcRestClient:
-        """Use the go2rtc instance managed by this Home Assistant."""
+        """Use HA's configured go2rtc only when its optional setup succeeded."""
         config = self.hass.data.get("go2rtc")
         if config is None:
-            raise HomerunApiError("Home Assistant go2rtc is not ready")
+            raise HomeAssistantError(
+                "Camera streaming and snapshots require a running HA go2rtc integration"
+            )
+        # The configured go2rtc integration installs its client requirement.
+        # Do not import it while loading this platform on installations without it.
+        try:
+            from go2rtc_client import Go2RtcRestClient
+        except ImportError as err:
+            raise HomeAssistantError(
+                "The go2rtc client is unavailable; check the HA go2rtc integration setup"
+            ) from err
         return Go2RtcRestClient(config.session, config.url)
 
     async def stream_source(self) -> Optional[str]:
@@ -107,12 +125,15 @@ class HomerunCamera(HomerunBaseEntity, Camera):
         and return its H.264 relay instead. Port 18554 belongs to HA's
         built-in go2rtc instance; an external go2rtc needs its own RTSP port.
         """
+        client = self._relay_client()
+        # This module is optional too, so import it only after go2rtc is available.
+        from homeassistant.components.go2rtc.const import HA_MANAGED_URL
+
         async with self._source_lock:
             if not self._live_source or time.monotonic() >= self._source_expires:
                 self._live_source = await self._async_cloud_stream_source()
                 self._source_expires = time.monotonic() + 3000
             source = f"ffmpeg:{self._live_source}#video=h264#audio=opus"
-            client = self._relay_client()
             streams = await client.streams.list()
             stream = streams.get(self._relay_name)
             if stream is None or not any(p.url == source for p in stream.producers):
