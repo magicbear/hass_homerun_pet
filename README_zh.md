@@ -63,6 +63,12 @@
 
 ---
 
+## 摄像头播放与 HomeKit
+
+直播和快照需要 HA 的 `go2rtc` 集成正常运行；缺失时不影响其他设备功能。HomeKit 仅支持 **HA 内置 go2rtc**（HA OS / Container），外部 go2rtc 仅支持 HA 播放。非 Docker 安装需在 HA 的 go2rtc 集成中配置外部 URL。
+
+---
+
 ## 🛠️ 逆向协议与技术原理
 
 - **密码哈希算法**：`MD5(appKey + password + "#q&8UT6eRV79ol4*")[7:27]`
